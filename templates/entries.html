@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h1>{{ title }}</h1>
+  <p><a href="/entries/new">+ New entry</a></p>
+  <table>
+    <tr>
+      <th>Date</th><th>Customer</th><th>Product</th>
+      <th>Quantity</th><th>Cost (₹)</th><th>Quality</th><th>Fat %</th>
+    </tr>
+    {% for e in entries %}
+    <tr>
+      <td>{{ e['entry_date'] }}</td>
+      <td>{{ e['customer'] }}</td>
+      <td>{{ e['product'] }}</td>
+      <td>{{ e['quantity'] }} {{ e['unit'] }}</td>
+      <td>{{ e['cost'] }}</td>
+      <td>{{ e['quality'] }}</td>
+      <td>{{ e['fat_percent'] or '' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p><a href="/">Back to home</a></p>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h1>{{ title }}</h1>
+  <form method="post">
+    <input type="text" name="name" placeholder="Customer name" required>
+    <input type="text" name="phone" placeholder="Phone (optional)">
+    <button type="submit">Add customer</button>
+  </form>
+  <table>
+    <tr><th>Name</th><th>Phone</th></tr>
+    {% for c in customers %}
+    <tr><td>{{ c['name'] }}</td><td>{{ c['phone'] or '' }}</td></tr>
+    {% endfor %}
+  </table>
+  <p><a href="/">Back to home</a></p>
+</body>
+</html>
