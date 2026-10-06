@@ -96,5 +96,76 @@ def entries():
     return render_template("entries.html", title="Daily Entries", entries=rows)
 
 
+@app.route("/report")
+def report():
+    conn = get_db()
+    customers = conn.execute(
+        "SELECT id, name FROM users WHERE role = 'customer' ORDER BY name"
+    ).fetchall()
+
+    month = request.args.get("month") or date.today().strftime("%Y-%m")
+    user_id = request.args.get("user_id", "")
+    summary = None
+    breakdown = []
+    quality_rows = []
+
+    if user_id:
+        breakdown = conn.execute(
+            """SELECT p.name AS product, p.unit,
+                      SUM(e.quantity) AS total_qty,
+                      SUM(e.cost) AS total_cost,
+                      COUNT(*) AS days
+               FROM entries e
+               JOIN products p ON p.id = e.product_id
+               WHERE e.user_id = ? AND strftime('%Y-%m', e.entry_date) = ?
+               GROUP BY p.id
+               ORDER BY p.name""",
+            (user_id, month),
+        ).fetchall()
+
+        milk = conn.execute(
+            """SELECT COALESCE(SUM(e.quantity), 0) AS litres,
+                      AVG(e.fat_percent) AS avg_fat
+               FROM entries e
+               JOIN products p ON p.id = e.product_id
+               WHERE e.user_id = ? AND p.name = 'Milk'
+                 AND strftime('%Y-%m', e.entry_date) = ?""",
+            (user_id, month),
+        ).fetchone()
+
+        quality_rows = conn.execute(
+            """SELECT e.quality, COUNT(*) AS n
+               FROM entries e
+               JOIN products p ON p.id = e.product_id
+               WHERE e.user_id = ? AND p.name = 'Milk'
+                 AND strftime('%Y-%m', e.entry_date) = ?
+               GROUP BY e.quality""",
+            (user_id, month),
+        ).fetchall()
+
+        customer = conn.execute(
+            "SELECT name FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+
+        summary = {
+            "customer": customer["name"] if customer else "",
+            "milk_litres": milk["litres"],
+            "avg_fat": milk["avg_fat"],
+            "total_cost": sum(r["total_cost"] for r in breakdown),
+        }
+
+    conn.close()
+    return render_template(
+        "report.html",
+        title="Monthly Report",
+        customers=customers,
+        month=month,
+        user_id=user_id,
+        summary=summary,
+        breakdown=breakdown,
+        quality_rows=quality_rows,
+    )
+
+
 if __name__ == "__main__":
     app.run(debug=True)
