@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h1>{{ title }}</h1>
+  {% if not customers %}
+    <p>Add a customer first on the <a href="/customers">Customers</a> page.</p>
+  {% else %}
+  <form method="post" class="stack">
+    <label>Customer
+      <select name="user_id" required>
+        {% for c in customers %}<option value="{{ c['id'] }}">{{ c['name'] }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Product
+      <select name="product_id" required>
+        {% for p in products %}<option value="{{ p['id'] }}">{{ p['name'] }} ({{ p['unit'] }})</option>{% endfor %}
+      </select>
+    </label>
+    <label>Date <input type="date" name="entry_date" value="{{ today }}" required></label>
+    <label>Quantity <input type="number" name="quantity" step="0.01" min="0.01" required></label>
+    <label>Milk quality
+      <select name="quality">
+        <option>Good</option>
+        <option>Average</option>
+        <option>Poor</option>
+      </select>
+    </label>
+    <label>Fat % (optional) <input type="number" name="fat_percent" step="0.1" min="0"></label>
+    <button type="submit">Save entry</button>
+  </form>
+  {% endif %}
+  <p><a href="/">Back to home</a></p>
+</body>
+</html>
