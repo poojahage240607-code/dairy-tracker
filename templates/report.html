@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h1>{{ title }}</h1>
+
+  <form method="get">
+    <select name="user_id" required>
+      <option value="">Select customer</option>
+      {% for c in customers %}
+      <option value="{{ c['id'] }}" {% if c['id']|string == user_id %}selected{% endif %}>{{ c['name'] }}</option>
+      {% endfor %}
+    </select>
+    <input type="month" name="month" value="{{ month }}" required>
+    <button type="submit">Show report</button>
+  </form>
+
+  {% if summary %}
+  <h2>{{ summary.customer }} &ndash; {{ month }}</h2>
+  <ul>
+    <li><strong>Total milk consumed:</strong> {{ '%.2f'|format(summary.milk_litres) }} litres</li>
+    <li><strong>Total cost (all products):</strong> ₹{{ '%.2f'|format(summary.total_cost) }}</li>
+    <li><strong>Average fat %:</strong>
+      {% if summary.avg_fat is not none %}{{ '%.1f'|format(summary.avg_fat) }}{% else %}not recorded{% endif %}
+    </li>
+  </ul>
+
+  <h3>Milk quality (days)</h3>
+  {% if quality_rows %}
+  <ul>
+    {% for q in quality_rows %}<li>{{ q['quality'] }}: {{ q['n'] }}</li>{% endfor %}
+  </ul>
+  {% else %}
+  <p>No milk entries this month.</p>
+  {% endif %}
+
+  <h3>Breakdown by product</h3>
+  {% if breakdown %}
+  <table>
+    <tr><th>Product</th><th>Quantity</th><th>Cost (₹)</th><th>Entries</th></tr>
+    {% for b in breakdown %}
+    <tr>
+      <td>{{ b['product'] }}</td>
+      <td>{{ '%.2f'|format(b['total_qty']) }} {{ b['unit'] }}</td>
+      <td>{{ '%.2f'|format(b['total_cost']) }}</td>
+      <td>{{ b['days'] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p>No entries found for this month.</p>
+  {% endif %}
+  {% endif %}
+
+  <p><a href="/">Back to home</a></p>
+</body>
+</html>
