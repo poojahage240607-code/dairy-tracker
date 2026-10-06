@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h1>{{ title }}</h1>
+  <table>
+    <tr><th>Product</th><th>Unit</th><th>Rate (₹)</th></tr>
+    {% for p in products %}
+    <tr>
+      <td>{{ p['name'] }}</td>
+      <td>{{ p['unit'] }}</td>
+      <td>{{ p['rate_per_unit'] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p><a href="/">Back to home</a></p>
+</body>
+</html>
