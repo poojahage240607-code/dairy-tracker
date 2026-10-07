@@ -11,3 +11,5 @@ th { background: #1a5fb4; color: white; }
 .stack { display: flex; flex-direction: column; max-width: 320px; gap: 12px; }
 input, select, button { padding: 8px; font-size: 14px; }
 button { background: #1a5fb4; color: white; border: none; cursor: pointer; }
+.chart-box { max-width: 700px; margin: 20px 0; }
+.flash { color: #b00020; font-weight: bold; }

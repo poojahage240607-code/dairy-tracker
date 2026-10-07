@@ -7,15 +7,24 @@
 </head>
 <body>
   <h1>{{ title }}</h1>
-  <p>Track your daily milk purchases, quality and monthly consumption.
-     <p>
+  {% for m in get_flashed_messages() %}<p class="flash">{{ m }}</p>{% endfor %}
+  <p>Track your daily milk purchases, quality and monthly consumption.</p>
+
+  {% if session.get('user_id') %}
+  <p>Logged in as <strong>{{ session['name'] }}</strong> ({{ session['role'] }}) |
+     <a href="/logout">Log out</a></p>
+  <p>
+    {% if session['role'] == 'admin' %}
     <a href="/customers">Customers</a> |
     <a href="/entries/new">New entry</a> |
+    {% endif %}
     <a href="/entries">Daily entries</a> |
-       <a href="/report">Monthly report</a> |
+    <a href="/report">Monthly report</a> |
+    <a href="/dashboard">Dashboard</a> |
     <a href="/products">Products</a>
-
-   </p>
   </p>
+  {% else %}
+  <p><a href="/login">Log in</a> | <a href="/register">Register</a></p>
+  {% endif %}
 </body>
 </html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <h1>{{ title }}</h1>
+
+  <form method="get">
+    <select name="user_id" required>
+      <option value="">Select customer</option>
+      {% for c in customers %}
+      <option value="{{ c['id'] }}" {% if c['id']|string == user_id %}selected{% endif %}>{{ c['name'] }}</option>
+      {% endfor %}
+    </select>
+    <input type="month" name="month" value="{{ month }}" required>
+    <button type="submit">Show dashboard</button>
+  </form>
+
+  {% if customer_name %}
+    <h2>{{ customer_name }} &ndash; {{ month }}</h2>
+    {% if labels %}
+      <div class="chart-box"><canvas id="litresChart"></canvas></div>
+      <div class="chart-box"><canvas id="costChart"></canvas></div>
+      <script>
+        const labels = {{ labels|tojson }};
+        const litres = {{ litres|tojson }};
+        const costs = {{ costs|tojson }};
+
+        new Chart(document.getElementById("litresChart"), {
+          type: "bar",
+          data: { labels: labels, datasets: [{ label: "Milk (litres)", data: litres, backgroundColor: "#1a5fb4" }] }
+        });
+
+        new Chart(document.getElementById("costChart"), {
+          type: "line",
+          data: { labels: labels, datasets: [{ label: "Daily cost (₹)", data: costs, borderColor: "#c64600", tension: 0.2 }] }
+        });
+      </script>
+    {% else %}
+      <p>No entries found for this month.</p>
+    {% endif %}
+  {% endif %}
+
+  <p><a href="/">Back to home</a></p>
+</body>
+</html>
