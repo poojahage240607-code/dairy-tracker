@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h1>{{ title }}</h1>
+  {% for m in get_flashed_messages() %}<p class="flash">{{ m }}</p>{% endfor %}
+  <form method="post" class="stack">
+    <input type="text" name="name" placeholder="Full name" required>
+    <input type="text" name="phone" placeholder="Phone number" required>
+    <input type="password" name="password" placeholder="Password (min 6 characters)" required>
+    <button type="submit">Create account</button>
+  </form>
+  <p>Already registered? <a href="/login">Log in</a></p>
+</body>
+</html>

@@ -1,17 +1,138 @@
+import os
 from datetime import date
-from flask import Flask, render_template, request, redirect, url_for
+from functools import wraps
+
+from flask import Flask, render_template, request, redirect, url_for, session, flash
+from werkzeug.security import generate_password_hash, check_password_hash
+
 from db import get_db, init_db
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
 init_db()
 
 
+# ---------- helpers ----------
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("login"))
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def admin_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("login"))
+        if session.get("role") != "admin":
+            flash("Only the vendor (admin) can open that page.")
+            return redirect(url_for("home"))
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def visible_customers(conn):
+    """Admin sees all customers; a customer sees only themselves."""
+    if session["role"] == "admin":
+        return conn.execute(
+            "SELECT id, name FROM users WHERE role = 'customer' ORDER BY name"
+        ).fetchall()
+    return conn.execute(
+        "SELECT id, name FROM users WHERE id = ?", (session["user_id"],)
+    ).fetchall()
+
+
+def chosen_user_id():
+    """A customer is always limited to their own id."""
+    if session["role"] != "admin":
+        return str(session["user_id"])
+    return request.args.get("user_id", "")
+
+
+# ---------- account pages ----------
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        name = request.form["name"].strip()
+        phone = request.form["phone"].strip()
+        password = request.form["password"]
+
+        if not name or not phone or len(password) < 6:
+            flash("Enter your name, phone and a password of at least 6 characters.")
+            return render_template("register.html", title="Register")
+
+        conn = get_db()
+        existing = conn.execute(
+            "SELECT * FROM users WHERE phone = ?", (phone,)
+        ).fetchone()
+
+        if existing and existing["password_hash"]:
+            conn.close()
+            flash("That phone number is already registered. Please log in.")
+            return redirect(url_for("login"))
+
+        pw_hash = generate_password_hash(password)
+        if existing:
+            conn.execute(
+                "UPDATE users SET name = ?, password_hash = ? WHERE id = ?",
+                (name, pw_hash, existing["id"]),
+            )
+        else:
+            has_admin = conn.execute(
+                "SELECT 1 FROM users WHERE role = 'admin' LIMIT 1"
+            ).fetchone()
+            role = "customer" if has_admin else "admin"
+            conn.execute(
+                "INSERT INTO users (name, phone, password_hash, role) VALUES (?, ?, ?, ?)",
+                (name, phone, pw_hash, role),
+            )
+        conn.commit()
+        conn.close()
+        flash("Account ready. Please log in.")
+        return redirect(url_for("login"))
+
+    return render_template("register.html", title="Register")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        phone = request.form["phone"].strip()
+        password = request.form["password"]
+        conn = get_db()
+        user = conn.execute(
+            "SELECT * FROM users WHERE phone = ?", (phone,)
+        ).fetchone()
+        conn.close()
+
+        if user and user["password_hash"] and check_password_hash(user["password_hash"], password):
+            session.clear()
+            session["user_id"] = user["id"]
+            session["name"] = user["name"]
+            session["role"] = user["role"]
+            return redirect(url_for("home"))
+        flash("Wrong phone number or password.")
+
+    return render_template("login.html", title="Login")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+# ---------- main pages ----------
 @app.route("/")
 def home():
     return render_template("index.html", title="Dairy Tracker")
 
 
 @app.route("/products")
+@login_required
 def products():
     conn = get_db()
     rows = conn.execute("SELECT * FROM products ORDER BY name").fetchall()
@@ -20,17 +141,24 @@ def products():
 
 
 @app.route("/customers", methods=["GET", "POST"])
+@admin_required
 def customers():
     conn = get_db()
     if request.method == "POST":
         name = request.form["name"].strip()
         phone = request.form["phone"].strip()
-        if name:
-            conn.execute(
-                "INSERT INTO users (name, phone, role) VALUES (?, ?, 'customer')",
-                (name, phone),
-            )
-            conn.commit()
+        if name and phone:
+            exists = conn.execute(
+                "SELECT 1 FROM users WHERE phone = ?", (phone,)
+            ).fetchone()
+            if exists:
+                flash("A user with that phone number already exists.")
+            else:
+                conn.execute(
+                    "INSERT INTO users (name, phone, role) VALUES (?, ?, 'customer')",
+                    (name, phone),
+                )
+                conn.commit()
         conn.close()
         return redirect(url_for("customers"))
     rows = conn.execute(
@@ -41,6 +169,7 @@ def customers():
 
 
 @app.route("/entries/new", methods=["GET", "POST"])
+@admin_required
 def new_entry():
     conn = get_db()
     if request.method == "POST":
@@ -82,29 +211,32 @@ def new_entry():
 
 
 @app.route("/entries")
+@login_required
 def entries():
     conn = get_db()
-    rows = conn.execute(
-        """SELECT e.entry_date, u.name AS customer, p.name AS product, p.unit,
-                  e.quantity, e.cost, e.quality, e.fat_percent
-           FROM entries e
-           JOIN users u ON u.id = e.user_id
-           JOIN products p ON p.id = e.product_id
-           ORDER BY e.entry_date DESC, e.id DESC"""
-    ).fetchall()
+    query = """SELECT e.entry_date, u.name AS customer, p.name AS product, p.unit,
+                      e.quantity, e.cost, e.quality, e.fat_percent
+               FROM entries e
+               JOIN users u ON u.id = e.user_id
+               JOIN products p ON p.id = e.product_id"""
+    params = ()
+    if session["role"] != "admin":
+        query += " WHERE e.user_id = ?"
+        params = (session["user_id"],)
+    query += " ORDER BY e.entry_date DESC, e.id DESC"
+    rows = conn.execute(query, params).fetchall()
     conn.close()
     return render_template("entries.html", title="Daily Entries", entries=rows)
 
 
 @app.route("/report")
+@login_required
 def report():
     conn = get_db()
-    customers = conn.execute(
-        "SELECT id, name FROM users WHERE role = 'customer' ORDER BY name"
-    ).fetchall()
+    customers = visible_customers(conn)
 
     month = request.args.get("month") or date.today().strftime("%Y-%m")
-    user_id = request.args.get("user_id", "")
+    user_id = chosen_user_id()
     summary = None
     breakdown = []
     quality_rows = []
@@ -164,6 +296,49 @@ def report():
         summary=summary,
         breakdown=breakdown,
         quality_rows=quality_rows,
+    )
+
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    conn = get_db()
+    customers = visible_customers(conn)
+
+    month = request.args.get("month") or date.today().strftime("%Y-%m")
+    user_id = chosen_user_id()
+    labels, litres, costs = [], [], []
+    customer_name = ""
+
+    if user_id:
+        rows = conn.execute(
+            """SELECT e.entry_date AS d,
+                      SUM(CASE WHEN p.name = 'Milk' THEN e.quantity ELSE 0 END) AS litres,
+                      SUM(e.cost) AS cost
+               FROM entries e
+               JOIN products p ON p.id = e.product_id
+               WHERE e.user_id = ? AND strftime('%Y-%m', e.entry_date) = ?
+               GROUP BY e.entry_date
+               ORDER BY e.entry_date""",
+            (user_id, month),
+        ).fetchall()
+        labels = [r["d"] for r in rows]
+        litres = [r["litres"] for r in rows]
+        costs = [r["cost"] for r in rows]
+        c = conn.execute("SELECT name FROM users WHERE id = ?", (user_id,)).fetchone()
+        customer_name = c["name"] if c else ""
+
+    conn.close()
+    return render_template(
+        "dashboard.html",
+        title="Dashboard",
+        customers=customers,
+        month=month,
+        user_id=user_id,
+        customer_name=customer_name,
+        labels=labels,
+        litres=litres,
+        costs=costs,
     )
 
 
