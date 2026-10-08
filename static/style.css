@@ -13,3 +13,56 @@ input, select, button { padding: 8px; font-size: 14px; }
 button { background: #1a5fb4; color: white; border: none; cursor: pointer; }
 .chart-box { max-width: 700px; margin: 20px 0; }
 .flash { color: #b00020; font-weight: bold; }
+/* Dashboard upgrade */
+.muted { color: #6b7785; }
+
+.dash-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.dash-head h2 { margin: 24px 0 0; }
+.month-nav a {
+  display: inline-block;
+  padding: 6px 12px;
+  margin-left: 6px;
+  background: #ffffff;
+  border: 1px solid #dde3ea;
+  border-radius: 6px;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  margin: 16px 0;
+}
+.kpi {
+  background: #ffffff;
+  border: 1px solid #dde3ea;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+.kpi .label { font-size: 13px; color: #6b7785; }
+.kpi .value { font-size: 26px; font-weight: 700; color: #1a5fb4; margin-top: 4px; }
+.kpi .delta { font-size: 12px; color: #52606d; margin-top: 2px; }
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin: 16px 0 30px;
+}
+.chart-card {
+  background: #ffffff;
+  border: 1px solid #dde3ea;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+.chart-card.wide { grid-column: 1 / -1; }
+.chart-card h3 { margin: 0 0 10px; font-size: 15px; }
+.chart-wrap { position: relative; height: 260px; }

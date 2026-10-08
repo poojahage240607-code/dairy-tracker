@@ -298,6 +298,17 @@ def report():
         quality_rows=quality_rows,
     )
 
+def shift_month(month, delta):
+    """Return 'YYYY-MM' moved by `delta` months, or None if month is invalid."""
+    try:
+        year, mon = (int(x) for x in month.split("-"))
+    except ValueError:
+        return None
+    if not 1 <= mon <= 12:
+        return None
+    index = year * 12 + (mon - 1) + delta
+    return f"{index // 12}-{index % 12 + 1:02d}"
+
 
 @app.route("/dashboard")
 @login_required
@@ -306,11 +317,20 @@ def dashboard():
     customers = visible_customers(conn)
 
     month = request.args.get("month") or date.today().strftime("%Y-%m")
+    if shift_month(month, 0) is None:
+        month = date.today().strftime("%Y-%m")
     user_id = chosen_user_id()
-    labels, litres, costs = [], [], []
+
+    data = {
+        "labels": [], "litres": [], "costs": [],
+        "product_labels": [], "product_costs": [],
+        "quality_labels": [], "quality_counts": [],
+    }
+    stats = None
     customer_name = ""
 
     if user_id:
+        # Daily totals for the two main charts
         rows = conn.execute(
             """SELECT e.entry_date AS d,
                       SUM(CASE WHEN p.name = 'Milk' THEN e.quantity ELSE 0 END) AS litres,
@@ -322,9 +342,72 @@ def dashboard():
                ORDER BY e.entry_date""",
             (user_id, month),
         ).fetchall()
-        labels = [r["d"] for r in rows]
-        litres = [r["litres"] for r in rows]
-        costs = [r["cost"] for r in rows]
+        data["labels"] = [r["d"] for r in rows]
+        data["litres"] = [r["litres"] for r in rows]
+        data["costs"] = [r["cost"] for r in rows]
+
+        # Spend by product
+        product_rows = conn.execute(
+            """SELECT p.name AS product, SUM(e.cost) AS cost
+               FROM entries e
+               JOIN products p ON p.id = e.product_id
+               WHERE e.user_id = ? AND strftime('%Y-%m', e.entry_date) = ?
+               GROUP BY p.id
+               ORDER BY cost DESC""",
+            (user_id, month),
+        ).fetchall()
+        data["product_labels"] = [r["product"] for r in product_rows]
+        data["product_costs"] = [r["cost"] for r in product_rows]
+
+        # Milk quality (number of entries per rating)
+        quality_rows = conn.execute(
+            """SELECT COALESCE(e.quality, 'Not recorded') AS quality, COUNT(*) AS n
+               FROM entries e
+               JOIN products p ON p.id = e.product_id
+               WHERE e.user_id = ? AND p.name = 'Milk'
+                 AND strftime('%Y-%m', e.entry_date) = ?
+               GROUP BY 1""",
+            (user_id, month),
+        ).fetchall()
+        data["quality_labels"] = [r["quality"] for r in quality_rows]
+        data["quality_counts"] = [r["n"] for r in quality_rows]
+
+        # Average fat % for milk
+        avg_fat = conn.execute(
+            """SELECT AVG(e.fat_percent) AS avg_fat
+               FROM entries e
+               JOIN products p ON p.id = e.product_id
+               WHERE e.user_id = ? AND p.name = 'Milk'
+                 AND strftime('%Y-%m', e.entry_date) = ?""",
+            (user_id, month),
+        ).fetchone()["avg_fat"]
+
+        # Milk bought in the previous month, for the comparison card
+        prev_litres = conn.execute(
+            """SELECT COALESCE(SUM(e.quantity), 0) AS litres
+               FROM entries e
+               JOIN products p ON p.id = e.product_id
+               WHERE e.user_id = ? AND p.name = 'Milk'
+                 AND strftime('%Y-%m', e.entry_date) = ?""",
+            (user_id, shift_month(month, -1)),
+        ).fetchone()["litres"]
+
+        total_litres = sum(data["litres"])
+        total_cost = sum(data["costs"])
+        milk_days = sum(1 for x in data["litres"] if x > 0)
+        change = None
+        if prev_litres > 0:
+            change = round((total_litres - prev_litres) / prev_litres * 100, 1)
+
+        stats = {
+            "total_litres": total_litres,
+            "total_cost": total_cost,
+            "days": len(data["labels"]),
+            "avg_litres": total_litres / milk_days if milk_days else 0,
+            "avg_fat": avg_fat,
+            "change": change,
+        }
+
         c = conn.execute("SELECT name FROM users WHERE id = ?", (user_id,)).fetchone()
         customer_name = c["name"] if c else ""
 
@@ -334,11 +417,12 @@ def dashboard():
         title="Dashboard",
         customers=customers,
         month=month,
+        prev_month=shift_month(month, -1),
+        next_month=shift_month(month, 1),
         user_id=user_id,
         customer_name=customer_name,
-        labels=labels,
-        litres=litres,
-        costs=costs,
+        stats=stats,
+        **data,
     )
 
 

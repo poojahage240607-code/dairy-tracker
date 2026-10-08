@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ title }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <h1>{{ title }}</h1>
+  <h1>🥛 {{ title }}</h1>
 
   <form method="get">
     <select name="user_id" required>
@@ -21,28 +22,167 @@
   </form>
 
   {% if customer_name %}
-    <h2>{{ customer_name }} &ndash; {{ month }}</h2>
-    {% if labels %}
-      <div class="chart-box"><canvas id="litresChart"></canvas></div>
-      <div class="chart-box"><canvas id="costChart"></canvas></div>
-      <script>
-        const labels = {{ labels|tojson }};
-        const litres = {{ litres|tojson }};
-        const costs = {{ costs|tojson }};
+  <div class="dash-head">
+    <div>
+      <h2>{{ customer_name }}</h2>
+      <span class="muted">{{ month }}</span>
+    </div>
+    <div class="month-nav">
+      <a href="{{ url_for('dashboard', user_id=user_id, month=prev_month) }}">&lsaquo; Previous</a>
+      <a href="{{ url_for('dashboard', user_id=user_id, month=next_month) }}">Next &rsaquo;</a>
+    </div>
+  </div>
 
-        new Chart(document.getElementById("litresChart"), {
-          type: "bar",
-          data: { labels: labels, datasets: [{ label: "Milk (litres)", data: litres, backgroundColor: "#1a5fb4" }] }
-        });
+  {% if stats and stats.days %}
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="label">Milk this month</div>
+      <div class="value">{{ '%.1f'|format(stats.total_litres) }} L</div>
+      {% if stats.change is not none %}
+      <div class="delta">{{ '▲' if stats.change >= 0 else '▼' }} {{ stats.change|abs }}% vs last month</div>
+      {% endif %}
+    </div>
+    <div class="kpi">
+      <div class="label">Total spend</div>
+      <div class="value">₹{{ '%.2f'|format(stats.total_cost) }}</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Avg per milk day</div>
+      <div class="value">{{ '%.2f'|format(stats.avg_litres) }} L</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Days with purchases</div>
+      <div class="value">{{ stats.days }}</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Avg fat %</div>
+      <div class="value">{% if stats.avg_fat is not none %}{{ '%.1f'|format(stats.avg_fat) }}%{% else %}&ndash;{% endif %}</div>
+    </div>
+  </div>
 
-        new Chart(document.getElementById("costChart"), {
-          type: "line",
-          data: { labels: labels, datasets: [{ label: "Daily cost (₹)", data: costs, borderColor: "#c64600", tension: 0.2 }] }
-        });
-      </script>
-    {% else %}
-      <p>No entries found for this month.</p>
-    {% endif %}
+  <div class="chart-grid">
+    <div class="chart-card wide">
+      <h3>Daily milk (litres)</h3>
+      <div class="chart-wrap"><canvas id="litresChart"></canvas></div>
+    </div>
+    <div class="chart-card wide">
+      <h3>Daily spend (₹)</h3>
+      <div class="chart-wrap"><canvas id="costChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Spend by product</h3>
+      <div class="chart-wrap"><canvas id="productChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Milk quality (entries)</h3>
+      {% if quality_counts %}
+      <div class="chart-wrap"><canvas id="qualityChart"></canvas></div>
+      {% else %}
+      <p class="muted">No milk entries this month.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div id="chart-data"
+       data-labels='{{ labels|tojson }}'
+       data-litres='{{ litres|tojson }}'
+       data-costs='{{ costs|tojson }}'
+       data-product-labels='{{ product_labels|tojson }}'
+       data-product-costs='{{ product_costs|tojson }}'
+       data-quality-labels='{{ quality_labels|tojson }}'
+       data-quality-counts='{{ quality_counts|tojson }}'></div>
+
+  <script>
+    const box = document.getElementById("chart-data");
+    const read = (key) => JSON.parse(box.dataset[key]);
+
+    const labels = read("labels");
+    const litres = read("litres");
+    const costs = read("costs");
+    const productLabels = read("productLabels");
+    const productCosts = read("productCosts");
+    const qualityLabels = read("qualityLabels");
+    const qualityCounts = read("qualityCounts");
+
+    Chart.defaults.font.family = "Segoe UI, Roboto, Arial, sans-serif";
+    Chart.defaults.color = "#52606d";
+
+    const base = { responsive: true, maintainAspectRatio: false };
+    const axes = {
+      y: { beginAtZero: true, grid: { color: "#eef1f5" } },
+      x: { grid: { display: false } }
+    };
+
+    new Chart(document.getElementById("litresChart"), {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{ label: "Milk (litres)", data: litres, backgroundColor: "#1a5fb4", borderRadius: 6 }]
+      },
+      options: { ...base, plugins: { legend: { display: false } }, scales: axes }
+    });
+
+    new Chart(document.getElementById("costChart"), {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Daily spend (₹)",
+          data: costs,
+          borderColor: "#c64600",
+          backgroundColor: "rgba(198, 70, 0, 0.12)",
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3
+        }]
+      },
+      options: {
+        ...base,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx) => "₹" + ctx.parsed.y.toFixed(2) } }
+        },
+        scales: axes
+      }
+    });
+
+    const palette = ["#1a5fb4", "#26a269", "#e5a50a", "#c64600", "#813d9c"];
+    new Chart(document.getElementById("productChart"), {
+      type: "doughnut",
+      data: {
+        labels: productLabels,
+        datasets: [{ data: productCosts, backgroundColor: palette, borderWidth: 2, borderColor: "#ffffff" }]
+      },
+      options: {
+        ...base,
+        cutout: "60%",
+        plugins: {
+          legend: { position: "bottom" },
+          tooltip: { callbacks: { label: (ctx) => ctx.label + ": ₹" + ctx.parsed.toFixed(2) } }
+        }
+      }
+    });
+
+    if (qualityCounts.length) {
+      const qualityColors = { Good: "#2e7d32", Average: "#f9a825", Poor: "#c62828" };
+      new Chart(document.getElementById("qualityChart"), {
+        type: "doughnut",
+        data: {
+          labels: qualityLabels,
+          datasets: [{
+            data: qualityCounts,
+            backgroundColor: qualityLabels.map((q) => qualityColors[q] || "#9aa5b1"),
+            borderWidth: 2,
+            borderColor: "#ffffff"
+          }]
+        },
+        options: { ...base, cutout: "60%", plugins: { legend: { position: "bottom" } } }
+      });
+    }
+  </script>
+  {% else %}
+  <p class="muted">No entries found for this month. Try another month with the buttons above.</p>
+  {% endif %}
   {% endif %}
 
   <p><a href="/">Back to home</a></p>
