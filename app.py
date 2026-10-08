@@ -214,7 +214,7 @@ def new_entry():
 @login_required
 def entries():
     conn = get_db()
-    query = """SELECT e.entry_date, u.name AS customer, p.name AS product, p.unit,
+    query = """SELECT e.id, e.entry_date, u.name AS customer, p.name AS product, p.unit,
                       e.quantity, e.cost, e.quality, e.fat_percent
                FROM entries e
                JOIN users u ON u.id = e.user_id
@@ -227,6 +227,80 @@ def entries():
     rows = conn.execute(query, params).fetchall()
     conn.close()
     return render_template("entries.html", title="Daily Entries", entries=rows)
+
+@app.route("/entries/<int:entry_id>/edit", methods=["GET", "POST"])
+@admin_required
+def edit_entry(entry_id):
+    conn = get_db()
+    entry = conn.execute("SELECT * FROM entries WHERE id = ?", (entry_id,)).fetchone()
+    if entry is None:
+        conn.close()
+        flash("Entry not found.")
+        return redirect(url_for("entries"))
+
+    if request.method == "POST":
+        user_id = request.form["user_id"]
+        product_id = request.form["product_id"]
+        entry_date = request.form["entry_date"]
+        quality = request.form["quality"]
+        try:
+            quantity = float(request.form["quantity"])
+            fat = request.form["fat_percent"].strip()
+            fat_percent = float(fat) if fat else None
+        except ValueError:
+            quantity, fat_percent = 0, None
+
+        product = conn.execute(
+            "SELECT rate_per_unit FROM products WHERE id = ?", (product_id,)
+        ).fetchone()
+
+        if quantity <= 0:
+            flash("Quantity must be a number greater than zero.")
+        elif product is None:
+            flash("Please choose a valid product.")
+        else:
+            # Keep the original cost if the product and quantity did not change,
+            # so fixing a date or quality note never changes the bill.
+            if str(entry["product_id"]) == product_id and entry["quantity"] == quantity:
+                cost = entry["cost"]
+            else:
+                cost = round(quantity * product["rate_per_unit"], 2)
+
+            conn.execute(
+                """UPDATE entries
+                   SET user_id = ?, product_id = ?, entry_date = ?, quantity = ?,
+                       cost = ?, quality = ?, fat_percent = ?
+                   WHERE id = ?""",
+                (user_id, product_id, entry_date, quantity, cost, quality, fat_percent, entry_id),
+            )
+            conn.commit()
+            conn.close()
+            flash("Entry updated.", "success")
+            return redirect(url_for("entries"))
+
+    customers = conn.execute(
+        "SELECT id, name FROM users WHERE role = 'customer' ORDER BY name"
+    ).fetchall()
+    products = conn.execute("SELECT id, name, unit FROM products ORDER BY name").fetchall()
+    conn.close()
+    return render_template(
+        "edit_entry.html",
+        title="Edit Entry",
+        entry=entry,
+        customers=customers,
+        products=products,
+    )
+
+
+@app.route("/entries/<int:entry_id>/delete", methods=["POST"])
+@admin_required
+def delete_entry(entry_id):
+    conn = get_db()
+    conn.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
+    conn.commit()
+    conn.close()
+    flash("Entry deleted.", "success")
+    return redirect(url_for("entries"))
 
 
 @app.route("/report")

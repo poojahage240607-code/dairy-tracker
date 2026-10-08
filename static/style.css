@@ -66,3 +66,31 @@ button { background: #1a5fb4; color: white; border: none; cursor: pointer; }
 .chart-card.wide { grid-column: 1 / -1; }
 .chart-card h3 { margin: 0 0 10px; font-size: 15px; }
 .chart-wrap { position: relative; height: 260px; }
+/* Entry actions */
+.actions { white-space: nowrap; }
+.actions a { margin-right: 8px; }
+form.inline {
+  display: inline;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+button.danger {
+  background: #b00020;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+button.danger:hover { background: #8a0019; }
+.flash.success { color: #1b5e20; background: #e8f5e9; border-color: #c8e6c9; }
+.flash {
+  color: #b00020;
+  background: #fdecee;
+  border: 1px solid #f5c2c7;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+}
