@@ -1,5 +1,5 @@
 import os
-from datetime import date
+from datetime import date,timedelta
 from functools import wraps
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash
@@ -9,6 +9,9 @@ from db import get_db, init_db
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
+BUSINESS_NAME = "Gopal Dairy"
+BUSINESS_ADDRESS = "Adarsh colony , Gorakshan road ."
+BUSINESS_PHONE = "98xxxxxxxx"
 init_db()
 
 
@@ -499,6 +502,111 @@ def dashboard():
         **data,
     )
 
+def parse_date(value, default):
+    try:
+        return date.fromisoformat(value)
+    except (TypeError, ValueError):
+        return default
 
+
+@app.route("/invoice")
+@login_required
+def invoice():
+    conn = get_db()
+    customers = visible_customers(conn)
+
+    today = date.today()
+    start = parse_date(request.args.get("from"), today.replace(day=1))
+    end = parse_date(request.args.get("to"), today)
+    error = None
+    if start > end:
+        error = "The start date must be on or before the end date."
+    elif (end - start).days > 366:
+        error = "Please choose a period of one year or less."
+
+    user_id = chosen_user_id()  # customers are always limited to their own bill
+
+    # Quick-pick period buttons
+    first_this = today.replace(day=1)
+    last_prev = first_this - timedelta(days=1)
+    first_prev = last_prev.replace(day=1)
+    periods = [
+        ("This month", first_this, today),
+        ("Last month", first_prev, last_prev),
+        ("Last 7 days", today - timedelta(days=6), today),
+        ("Last 30 days", today - timedelta(days=29), today),
+    ]
+    presets = [
+        (
+            label,
+            url_for("invoice", user_id=user_id, **{"from": s.isoformat(), "to": e.isoformat()}),
+        )
+        for label, s, e in periods
+    ]
+
+    bill = None
+    if user_id and not error:
+        customer = conn.execute(
+            "SELECT id, name, phone FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        if customer:
+            params = (user_id, start.isoformat(), end.isoformat())
+            lines = conn.execute(
+                """SELECT p.name AS product, p.unit,
+                          SUM(e.quantity) AS qty, SUM(e.cost) AS amount
+                   FROM entries e
+                   JOIN products p ON p.id = e.product_id
+                   WHERE e.user_id = ? AND e.entry_date BETWEEN ? AND ?
+                   GROUP BY p.id
+                   ORDER BY p.name""",
+                params,
+            ).fetchall()
+            details = conn.execute(
+                """SELECT e.entry_date, p.name AS product, p.unit,
+                          e.quantity, e.cost, e.quality
+                   FROM entries e
+                   JOIN products p ON p.id = e.product_id
+                   WHERE e.user_id = ? AND e.entry_date BETWEEN ? AND ?
+                   ORDER BY e.entry_date, e.id""",
+                params,
+            ).fetchall()
+            quality = conn.execute(
+                """SELECT COALESCE(e.quality, 'Not recorded') AS quality, COUNT(*) AS n
+                   FROM entries e
+                   JOIN products p ON p.id = e.product_id
+                   WHERE e.user_id = ? AND p.name = 'Milk'
+                     AND e.entry_date BETWEEN ? AND ?
+                   GROUP BY 1""",
+                params,
+            ).fetchall()
+
+            bill = {
+                "customer": customer,
+                "lines": lines,
+                "details": details,
+                "quality": quality,
+                "total": sum(r["amount"] for r in lines),
+                "milk_litres": sum(r["qty"] for r in lines if r["product"] == "Milk"),
+                "number": f"INV-{customer['id']:03d}-{start:%Y%m%d}-{end:%Y%m%d}",
+                "issued": today,
+            }
+
+    conn.close()
+    return render_template(
+        "invoice.html",
+        title="Invoice",
+        customers=customers,
+        user_id=user_id,
+        start=start,
+        end=end,
+        error=error,
+        presets=presets,
+        bill=bill,
+        business={
+            "name": BUSINESS_NAME,
+            "address": BUSINESS_ADDRESS,
+            "phone": BUSINESS_PHONE,
+        },
+    )
 if __name__ == "__main__":
     app.run(debug=True)
