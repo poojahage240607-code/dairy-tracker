@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h1>{{ title }}</h1>
+  {% for category, m in get_flashed_messages(with_categories=true) %}
+  <p class="flash {{ category }}">{{ m }}</p>
+  {% endfor %}
+
+  <form method="post" class="stack">
+    <label>Customer
+      <select name="user_id" required>
+        {% for c in customers %}
+        <option value="{{ c['id'] }}" {% if c['id'] == entry['user_id'] %}selected{% endif %}>{{ c['name'] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Product
+      <select name="product_id" required>
+        {% for p in products %}
+        <option value="{{ p['id'] }}" {% if p['id'] == entry['product_id'] %}selected{% endif %}>{{ p['name'] }} ({{ p['unit'] }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Date
+      <input type="date" name="entry_date" value="{{ entry['entry_date'] }}" required>
+    </label>
+    <label>Quantity
+      <input type="number" name="quantity" step="0.01" min="0.01" value="{{ entry['quantity'] }}" required>
+    </label>
+    <label>Milk quality
+      <select name="quality">
+        {% for q in ['Good', 'Average', 'Poor'] %}
+        <option {% if entry['quality'] == q %}selected{% endif %}>{{ q }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Fat % (optional)
+      <input type="number" name="fat_percent" step="0.1" min="0" value="{{ entry['fat_percent'] if entry['fat_percent'] is not none else '' }}">
+    </label>
+    <button type="submit">Save changes</button>
+  </form>
+  <p><a href="/entries">Cancel</a></p>
+</body>
+</html>

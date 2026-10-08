@@ -2,16 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ title }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <h1>{{ title }}</h1>
-  <p><a href="/entries/new">+ New entry</a></p>
+  {% for category, m in get_flashed_messages(with_categories=true) %}
+  <p class="flash {{ category }}">{{ m }}</p>
+  {% endfor %}
+
+  {% if session['role'] == 'admin' %}<p><a href="/entries/new">+ New entry</a></p>{% endif %}
+
   <table>
     <tr>
       <th>Date</th><th>Customer</th><th>Product</th>
       <th>Quantity</th><th>Cost (₹)</th><th>Quality</th><th>Fat %</th>
+      {% if session['role'] == 'admin' %}<th>Actions</th>{% endif %}
     </tr>
     {% for e in entries %}
     <tr>
@@ -22,6 +29,16 @@
       <td>{{ e['cost'] }}</td>
       <td>{{ e['quality'] }}</td>
       <td>{{ e['fat_percent'] or '' }}</td>
+      {% if session['role'] == 'admin' %}
+      <td class="actions">
+        <a href="{{ url_for('edit_entry', entry_id=e['id']) }}">Edit</a>
+        <form method="post" action="{{ url_for('delete_entry', entry_id=e['id']) }}"
+              class="inline"
+              onsubmit="return confirm('Delete this entry? This cannot be undone.');">
+          <button type="submit" class="danger">Delete</button>
+        </form>
+      </td>
+      {% endif %}
     </tr>
     {% endfor %}
   </table>
