@@ -94,3 +94,79 @@ button.danger:hover { background: #8a0019; }
   border-radius: 6px;
   font-weight: 600;
 }
+/* Invoice */
+.muted { color: #6b7785; }
+.num { text-align: right; }
+
+.presets { margin: 4px 0 16px; }
+.presets a {
+  display: inline-block;
+  padding: 6px 14px;
+  margin: 0 6px 6px 0;
+  font-size: 13px;
+  background: #ffffff;
+  border: 1px solid #dde3ea;
+  border-radius: 20px;
+}
+.presets a:hover { background: #eef4fb; text-decoration: none; }
+
+.invoice-sheet {
+  background: #ffffff;
+  border: 1px solid #dde3ea;
+  border-radius: 12px;
+  padding: 32px;
+  margin: 20px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.inv-head {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid #1a5fb4;
+}
+.inv-brand h2 { margin: 0 0 4px; color: #1a5fb4; font-size: 24px; }
+.inv-title { text-align: right; }
+.inv-title .big { font-size: 28px; font-weight: 700; letter-spacing: 3px; }
+.inv-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin: 20px 0;
+}
+.inv-meta h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #6b7785;
+}
+.inv-total { width: 100%; max-width: 320px; margin: 16px 0 0 auto; }
+.inv-total div { display: flex; justify-content: space-between; padding: 6px 0; }
+.inv-total .grand {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 2px solid #1a5fb4;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a5fb4;
+}
+.inv-note { margin-top: 16px; }
+.inv-foot {
+  margin-top: 30px;
+  padding-top: 14px;
+  border-top: 1px solid #dde3ea;
+  text-align: center;
+  font-size: 13px;
+  color: #6b7785;
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #ffffff; max-width: none; padding: 0; }
+  .invoice-sheet { border: none; box-shadow: none; padding: 0; margin: 0; }
+  table { box-shadow: none; border-radius: 0; }
+  th { background: #ffffff !important; color: #000000 !important; border-bottom: 2px solid #000000; }
+  tr { page-break-inside: avoid; }
+}

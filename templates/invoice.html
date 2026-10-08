@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h1 class="no-print">🧾 {{ title }}</h1>
+
+  <div class="no-print">
+    <form method="get">
+      {% if session['role'] == 'admin' %}
+      <select name="user_id" required>
+        <option value="">Select customer</option>
+        {% for c in customers %}
+        <option value="{{ c['id'] }}" {% if c['id']|string == user_id %}selected{% endif %}>{{ c['name'] }}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
+      <label>From <input type="date" name="from" value="{{ start.isoformat() }}" required></label>
+      <label>To <input type="date" name="to" value="{{ end.isoformat() }}" required></label>
+      <button type="submit">Generate bill</button>
+    </form>
+
+    <div class="presets">
+      {% for label, url in presets %}<a href="{{ url }}">{{ label }}</a>{% endfor %}
+    </div>
+
+    {% if error %}<p class="flash">{{ error }}</p>{% endif %}
+  </div>
+
+  {% if bill %}
+    {% if bill.lines %}
+    <div class="invoice-sheet">
+      <div class="inv-head">
+        <div class="inv-brand">
+          <h2>{{ business.name }}</h2>
+          <div>{{ business.address }}</div>
+          <div>{{ business.phone }}</div>
+        </div>
+        <div class="inv-title">
+          <div class="big">INVOICE</div>
+          <div>{{ bill.number }}</div>
+        </div>
+      </div>
+
+      <div class="inv-meta">
+        <div>
+          <h4>Billed to</h4>
+          <div><strong>{{ bill.customer['name'] }}</strong></div>
+          <div>{{ bill.customer['phone'] or '' }}</div>
+        </div>
+        <div>
+          <h4>Billing period</h4>
+          <div>{{ start.strftime('%d %b %Y') }} &ndash; {{ end.strftime('%d %b %Y') }}</div>
+        </div>
+        <div>
+          <h4>Issued on</h4>
+          <div>{{ bill.issued.strftime('%d %b %Y') }}</div>
+        </div>
+      </div>
+
+      <h3>Summary</h3>
+      <table>
+        <tr>
+          <th>Product</th>
+          <th class="num">Quantity</th>
+          <th class="num">Avg rate (₹)</th>
+          <th class="num">Amount (₹)</th>
+        </tr>
+        {% for l in bill.lines %}
+        <tr>
+          <td>{{ l['product'] }}</td>
+          <td class="num">{{ '%g'|format(l['qty']) }} {{ l['unit'] }}</td>
+          <td class="num">{{ '%.2f'|format(l['amount'] / l['qty']) }}</td>
+          <td class="num">{{ '%.2f'|format(l['amount']) }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+
+      <div class="inv-total">
+        {% if bill.milk_litres %}
+        <div><span>Total milk</span><span>{{ '%g'|format(bill.milk_litres) }} litres</span></div>
+        {% endif %}
+        <div class="grand"><span>Total amount</span><span>₹{{ '%.2f'|format(bill.total) }}</span></div>
+      </div>
+
+      {% if bill.quality %}
+      <p class="inv-note">
+        <strong>Milk quality:</strong>
+        {% for q in bill.quality %}{{ q['quality'] }} ({{ q['n'] }} {{ 'day' if q['n'] == 1 else 'days' }}){% if not loop.last %}, {% endif %}{% endfor %}
+      </p>
+      {% endif %}
+
+      <h3>Daily details</h3>
+      <table>
+        <tr>
+          <th>Date</th><th>Product</th>
+          <th class="num">Quantity</th><th class="num">Amount (₹)</th><th>Quality</th>
+        </tr>
+        {% for d in bill.details %}
+        <tr>
+          <td>{{ d['entry_date'] }}</td>
+          <td>{{ d['product'] }}</td>
+          <td class="num">{{ '%g'|format(d['quantity']) }} {{ d['unit'] }}</td>
+          <td class="num">{{ '%.2f'|format(d['cost']) }}</td>
+          <td>{{ d['quality'] or '' }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+
+      <div class="inv-foot">
+        Thank you for your business. This is a computer-generated invoice.
+      </div>
+    </div>
+
+    <p class="no-print">
+      <button type="button" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    </p>
+    {% else %}
+    <p class="muted no-print">
+      No purchases found between {{ start.strftime('%d %b %Y') }} and {{ end.strftime('%d %b %Y') }}.
+    </p>
+    {% endif %}
+  {% endif %}
+
+  <p class="no-print"><a href="/">Back to home</a></p>
+</body>
+</html>
